@@ -1,0 +1,450 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pomodoro Soundscape - Custom Timer & Focus App</title>
+    <!-- Tailwind CSS CDN for utility classes and quick styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Custom CSS CSS Variables for Theme Support & Smooth Transitions */
+        :root {
+            --bg-gradient: linear-gradient(135deg, #0f172a 0%, #1e1b4b 50%, #0f172a 100%);
+            --card-bg: rgba(30, 41, 59, 0.65);
+            --card-border: rgba(255, 255, 255, 0.12);
+            --text-main: #f8fafc;
+            --text-muted: #94a3b8;
+            --accent-color: #38bdf8;
+            --accent-hover: #0284c7;
+            --input-bg: rgba(15, 23, 42, 0.6);
+        }
+
+        [data-theme="warm"] {
+            --bg-gradient: linear-gradient(135deg, #2d2424 0%, #4a3b32 50%, #211919 100%);
+            --card-bg: rgba(60, 47, 47, 0.65);
+            --card-border: rgba(255, 255, 255, 0.15);
+            --text-main: #f7ebe1;
+            --text-muted: #d3c0b3;
+            --accent-color: #e07a5f;
+            --accent-hover: #d85a38;
+            --input-bg: rgba(35, 26, 26, 0.6);
+        }
+
+        body {
+            background: var(--bg-gradient);
+            color: var(--text-main);
+            min-height: 100vh;
+            font-family: 'Inter', system-ui, -apple-system, sans-serif;
+            transition: background 0.5s ease, color 0.3s ease;
+        }
+
+        /* Glassmorphism Effect Class */
+        .glass-card {
+            background: var(--card-bg);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid var(--card-border);
+            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+        }
+
+        /* Dynamic Accent Color Utility */
+        .bg-accent {
+            background-color: var(--accent-color);
+        }
+
+        .bg-accent:hover {
+            background-color: var(--accent-hover);
+        }
+
+        .text-accent {
+            color: var(--accent-color);
+        }
+
+        .border-accent {
+            border-color: var(--accent-color);
+        }
+
+        /* Range Input Accent Styling */
+        input[type="range"] {
+            accent-color: var(--accent-color);
+        }
+
+        /* Completed Task Strike-through */
+        .completed-task {
+            text-decoration: line-through;
+            opacity: 0.5;
+        }
+
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar {
+            width: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 3px;
+        }
+    </style>
+</head>
+<body class="flex flex-col items-center justify-between min-h-screen p-4 md:p-8">
+
+    <!-- Header & Theme Switcher -->
+    <header class="w-full max-w-4xl flex justify-between items-center mb-6">
+        <div class="flex items-center gap-3">
+            <span class="text-3xl">🎧</span>
+            <h1 class="text-2xl md:text-3xl font-bold tracking-tight">Pomodoro Soundscape</h1>
+        </div>
+        <button id="themeToggle" class="glass-card px-4 py-2 rounded-full text-sm font-medium hover:bg-white/10 transition-colors flex items-center gap-2">
+            <span id="themeIcon">☀️</span>
+            <span id="themeText">Warm Mode</span>
+        </button>
+    </header>
+
+    <!-- Main Content Container -->
+    <main class="w-full max-w-4xl grid grid-cols-1 md:grid-cols-2 gap-6 my-auto">
+
+        <!-- Timer Card (Spans 2 columns on desktop) -->
+        <section class="glass-card rounded-2xl p-6 md:p-8 md:col-span-2 text-center relative overflow-hidden">
+            <!-- Mode Preset Selector Buttons -->
+            <div class="flex flex-wrap justify-center gap-2 mb-6">
+                <button class="mode-btn glass-card px-4 py-2 rounded-xl text-sm font-medium opacity-80 hover:opacity-100 transition-all active-mode" onclick="setMode('work')">Focus (25m)</button>
+                <button class="mode-btn glass-card px-4 py-2 rounded-xl text-sm font-medium opacity-80 hover:opacity-100 transition-all" onclick="setMode('shortBreak')">Short Break (5m)</button>
+                <button class="mode-btn glass-card px-4 py-2 rounded-xl text-sm font-medium opacity-80 hover:opacity-100 transition-all" onclick="setMode('longBreak')">Long Break (15m)</button>
+            </div>
+
+            <!-- Custom Duration Input Modal/Inline Panel -->
+            <div class="mb-6 bg-black/20 rounded-xl p-4 max-w-md mx-auto border border-white/5">
+                <p class="text-xs text-muted mb-2 font-semibold uppercase tracking-wider">Custom Duration Settings</p>
+                <div class="flex items-center justify-center gap-3">
+                    <div class="flex items-center gap-1">
+                        <input type="number" id="customMinutes" min="1" max="180" value="25" class="w-16 bg-[var(--input-bg)] border border-[var(--card-border)] rounded-lg text-center py-1 text-sm focus:outline-none focus:border-[var(--accent-color)]">
+                        <span class="text-xs text-muted">min</span>
+                    </div>
+                    <div class="flex items-center gap-1">
+                        <input type="number" id="customSeconds" min="0" max="59" value="0" class="w-16 bg-[var(--input-bg)] border border-[var(--card-border)] rounded-lg text-center py-1 text-sm focus:outline-none focus:border-[var(--accent-color)]">
+                        <span class="text-xs text-muted">sec</span>
+                    </div>
+                    <button onclick="applyCustomTime()" class="bg-accent text-white px-3 py-1 rounded-lg text-xs font-semibold hover:opacity-90 transition-opacity">
+                        Apply Custom
+                    </button>
+                </div>
+            </div>
+
+            <!-- Big Digital Clock Display -->
+            <div class="timer-display text-6xl md:text-8xl font-black tracking-wider my-4 font-mono text-accent" id="timer">
+                25:00
+            </div>
+
+            <!-- Timer Action Buttons -->
+            <div class="flex justify-center gap-4 mt-6">
+                <button id="startBtn" onclick="toggleTimer()" class="bg-accent text-white px-8 py-3 rounded-full font-bold text-lg shadow-lg hover:opacity-90 active:scale-95 transition-all">
+                    Start
+                </button>
+                <button onclick="resetTimer()" class="glass-card px-6 py-3 rounded-full font-semibold hover:bg-white/10 active:scale-95 transition-all">
+                    Reset
+                </button>
+            </div>
+
+            <!-- Stats Bar -->
+            <div class="mt-6 text-sm text-muted">
+                Completed Focus Sessions Today: <span id="sessionCount" class="font-bold text-accent">0</span>
+            </div>
+        </section>
+
+        <!-- Ambient Soundscape Mixer Card -->
+        <section class="glass-card rounded-2xl p-6">
+            <h2 class="text-lg font-bold mb-4 flex items-center gap-2">
+                <span>🌧️</span> Ambient Soundscape
+            </h2>
+            
+            <!-- Rain Generator Controls -->
+            <div class="mb-5 bg-black/10 p-3 rounded-xl border border-white/5">
+                <div class="flex justify-between items-center mb-2">
+                    <span class="text-sm font-medium flex items-center gap-2">🌧️ Rain Noise</span>
+                    <input type="checkbox" id="rainToggle" onchange="toggleSound('rain')" class="w-4 h-4 rounded cursor-pointer accent-[var(--accent-color)]">
+                </div>
+                <input type="range" id="rainVol" min="0" max="1" step="0.01" value="0.5" oninput="updateVolume('rain')" class="w-full cursor-pointer">
+            </div>
+
+            <!-- Ocean Waves Controls -->
+            <div class="bg-black/10 p-3 rounded-xl border border-white/5">
+                <div class="flex justify-between items-center mb-2">
+                    <span class="text-sm font-medium flex items-center gap-2">🌊 Ocean Waves</span>
+                    <input type="checkbox" id="waveToggle" onchange="toggleSound('wave')" class="w-4 h-4 rounded cursor-pointer accent-[var(--accent-color)]">
+                </div>
+                <input type="range" id="waveVol" min="0" max="1" step="0.01" value="0.5" oninput="updateVolume('wave')" class="w-full cursor-pointer">
+            </div>
+            
+            <p class="text-xs text-muted mt-4 italic">
+                * Real-time audio generated via Web Audio API. Adjust sliders for mix.
+            </p>
+        </section>
+
+        <!-- Focus Tasks / To-Do List Card -->
+        <section class="glass-card rounded-2xl p-6 flex flex-col">
+            <h2 class="text-lg font-bold mb-4 flex items-center gap-2">
+                <span>📝</span> Focus Tasks
+            </h2>
+            
+            <!-- Input Row -->
+            <div class="flex gap-2 mb-4">
+                <input type="text" id="todoInput" placeholder="Add focus goal..." onkeypress="if(event.key==='Enter') addTodo()" class="flex-1 bg-[var(--input-bg)] border border-[var(--card-border)] rounded-xl px-4 py-2 text-sm focus:outline-none focus:border-[var(--accent-color)]">
+                <button onclick="addTodo()" class="bg-accent text-white px-4 py-2 rounded-xl text-sm font-semibold hover:opacity-90 transition-opacity">
+                    Add
+                </button>
+            </div>
+
+            <!-- Task Items List -->
+            <ul id="todoList" class="flex-1 overflow-y-auto max-h-48 space-y-2 pr-1">
+                <!-- Dynamic tasks render here -->
+            </ul>
+        </section>
+
+    </main>
+
+    <!-- Footer -->
+    <footer class="mt-8 text-xs text-muted text-center">
+        Pomodoro Soundscape &copy; 2026 | Built with AI Vibe Coding & Web Audio API
+    </footer>
+
+    <!-- JavaScript Logic -->
+    <script>
+        // --- 1. Timer & Preset Logic ---
+        let timer = null;
+        let timeLeft = 25 * 60; // Default 25 minutes in seconds
+        let isRunning = false;
+        let currentMode = 'work';
+        let completedSessions = 0;
+
+        // Standard Presets
+        const presets = {
+            work: 25 * 60,
+            shortBreak: 5 * 60,
+            longBreak: 15 * 60
+        };
+
+        // Formats seconds into MM:SS display
+        function updateDisplay() {
+            const minutes = Math.floor(timeLeft / 60);
+            const seconds = timeLeft % 60;
+            const timeString = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+            document.getElementById('timer').textContent = timeString;
+            document.title = `${timeString} - Pomodoro Soundscape`;
+        }
+
+        // Mode preset setter
+        function setMode(mode) {
+            currentMode = mode;
+            timeLeft = presets[mode];
+            
+            // Highlight active button
+            const modeBtns = document.querySelectorAll('.mode-btn');
+            modeBtns.forEach(btn => btn.classList.remove('border-accent', 'text-accent', 'font-bold'));
+            
+            if (isRunning) toggleTimer(); // Stop timer if switching modes
+            updateDisplay();
+        }
+
+        // Apply user-defined custom minutes & seconds
+        function applyCustomTime() {
+            const minsInput = parseInt(document.getElementById('customMinutes').value) || 0;
+            const secsInput = parseInt(document.getElementById('customSeconds').value) || 0;
+            
+            const totalSecs = (minsInput * 60) + secsInput;
+            
+            if (totalSecs <= 0) {
+                alert('Please enter a duration greater than 0 seconds.');
+                return;
+            }
+
+            if (isRunning) toggleTimer(); // Pause current running session
+            timeLeft = totalSecs;
+            updateDisplay();
+        }
+
+        // Start/Pause Toggle
+        function toggleTimer() {
+            const startBtn = document.getElementById('startBtn');
+            
+            if (isRunning) {
+                clearInterval(timer);
+                startBtn.textContent = 'Start';
+                startBtn.classList.remove('bg-red-500');
+                startBtn.classList.add('bg-accent');
+            } else {
+                timer = setInterval(() => {
+                    if (timeLeft > 0) {
+                        timeLeft--;
+                        updateDisplay();
+                    } else {
+                        clearInterval(timer);
+                        playNotificationTone();
+                        
+                        if (currentMode === 'work') {
+                            completedSessions++;
+                            document.getElementById('sessionCount').textContent = completedSessions;
+                        }
+                        
+                        alert('Session completed!');
+                        isRunning = false;
+                        startBtn.textContent = 'Start';
+                    }
+                }, 1000);
+
+                startBtn.textContent = 'Pause';
+                startBtn.classList.remove('bg-accent');
+                startBtn.classList.add('bg-red-500');
+            }
+            isRunning = !isRunning;
+        }
+
+        // Reset Timer
+        function resetTimer() {
+            if (isRunning) toggleTimer();
+            if (presets[currentMode]) {
+                timeLeft = presets[currentMode];
+            } else {
+                timeLeft = 25 * 60;
+            }
+            updateDisplay();
+        }
+
+        // Web Audio Synthesizer Beep for Timer End Notification
+        function playNotificationTone() {
+            try {
+                const ctx = new (window.AudioContext || window.webkitAudioContext)();
+                const osc = ctx.createOscillator();
+                const gain = ctx.createGain();
+                
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(587.33, ctx.currentTime); // D5 note
+                gain.gain.setValueAtTime(0.3, ctx.currentTime);
+                
+                osc.connect(gain);
+                gain.connect(ctx.destination);
+                
+                osc.start();
+                osc.stop(ctx.currentTime + 0.6);
+            } catch (e) {
+                console.log('Audio context not available for notification');
+            }
+        }
+
+        // --- 2. Web Audio Soundscape Synthesizer ---
+        let audioCtx = null;
+        const activeSounds = {};
+
+        function initAudioContext() {
+            if (!audioCtx) {
+                audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            }
+            if (audioCtx.state === 'suspended') {
+                audioCtx.resume();
+            }
+        }
+
+        // Generate synthetic white noise buffer
+        function createNoiseBuffer() {
+            const bufferSize = audioCtx.sampleRate * 2;
+            const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
+            const output = buffer.getChannelData(0);
+            for (let i = 0; i < bufferSize; i++) {
+                output[i] = Math.random() * 2 - 1;
+            }
+            return buffer;
+        }
+
+        // Toggle sound generator on/off
+        function toggleSound(type) {
+            initAudioContext();
+            const isChecked = document.getElementById(`${type}Toggle`).checked;
+
+            if (isChecked) {
+                const noiseBuffer = createNoiseBuffer();
+                const noiseSource = audioCtx.createBufferSource();
+                noiseSource.buffer = noiseBuffer;
+                noiseSource.loop = true;
+
+                const filter = audioCtx.createBiquadFilter();
+                const gainNode = audioCtx.createGain();
+
+                if (type === 'rain') {
+                    filter.type = 'lowpass';
+                    filter.frequency.value = 800; // Lowpass for rain effect
+                } else if (type === 'wave') {
+                    filter.type = 'bandpass';
+                    filter.frequency.value = 350; // Bandpass for ocean rumble
+                }
+
+                noiseSource.connect(filter);
+                filter.connect(gainNode);
+                gainNode.connect(audioCtx.destination);
+
+                const volumeSlider = document.getElementById(`${type}Vol`).value;
+                gainNode.gain.setValueAtTime(volumeSlider * 0.15, audioCtx.currentTime);
+
+                noiseSource.start();
+                activeSounds[type] = { source: noiseSource, gain: gainNode };
+            } else {
+                if (activeSounds[type]) {
+                    activeSounds[type].source.stop();
+                    delete activeSounds[type];
+                }
+            }
+        }
+
+        // Adjust sound volume dynamically
+        function updateVolume(type) {
+            if (activeSounds[type]) {
+                const volumeSlider = document.getElementById(`${type}Vol`).value;
+                activeSounds[type].gain.gain.setValueAtTime(volumeSlider * 0.15, audioCtx.currentTime);
+            }
+        }
+
+        // --- 3. Task Manager (To-Do List) ---
+        function addTodo() {
+            const input = document.getElementById('todoInput');
+            const text = input.value.trim();
+            if (!text) return;
+
+            const li = document.createElement('li');
+            li.className = "flex items-center justify-between p-2 rounded-lg bg-black/20 border border-white/5 text-sm";
+            
+            li.innerHTML = `
+                <span onclick="this.classList.toggle('completed-task')" class="cursor-pointer select-none flex-1 pr-2">${escapeHtml(text)}</span>
+                <button onclick="this.parentElement.remove()" class="text-red-400 hover:text-red-300 px-2 py-1 font-bold text-xs">✕</button>
+            `;
+
+            document.getElementById('todoList').appendChild(li);
+            input.value = '';
+        }
+
+        // Helper to sanitize HTML input
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        // --- 4. Theme Toggle Logic ---
+        const themeBtn = document.getElementById('themeToggle');
+        themeBtn.addEventListener('click', () => {
+            const isWarm = document.body.getAttribute('data-theme') === 'warm';
+            if (isWarm) {
+                document.body.removeAttribute('data-theme');
+                document.getElementById('themeIcon').textContent = '☀️';
+                document.getElementById('themeText').textContent = 'Warm Mode';
+            } else {
+                document.body.setAttribute('data-theme', 'warm');
+                document.getElementById('themeIcon').textContent = '🌙';
+                document.getElementById('themeText').textContent = 'Dark Mode';
+            }
+        });
+
+        // Initial setup on load
+        updateDisplay();
+    </script>
+</body>
+</html>
